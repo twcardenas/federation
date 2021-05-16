@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "rollup": "rollup -c ./rollup.config.js"
+    "esbuild": "esbuild --bundle js/index.mjs --minify --target=es2020 --external:node-fetch --external:crypto --global-name=composition --outfile=dist/composition.js"
   },
   "repository": {
     "type": "git",
