@@ -103,16 +103,15 @@ mod tests {
     fn invalid_sdl() {
         use crate::introspect::IntrospectionError;
         let expected_error = vec![IntrospectionError {
-            message: Some("Error in JS-Rust-land: sdl is empty".to_string()),
+            message: Some(r#"couldn't build schema from sdl: Error: Unknown type "Query".. Unknown type "Query"."#.to_string()),
             extensions: None,
         }];
         assert_eq!(
             expected_error,
             introspect(
-                "schema
-                    {
+                "schema {
                     query: Query
-                    }"
+                }"
                 .to_string()
             )
             .unwrap_err()

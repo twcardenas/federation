@@ -1,4 +1,4 @@
-import { buildSchema, GraphQLError, printIntrospectionSchema } from "graphql";
+import { buildSchema, graphqlSync, getIntrospectionQuery, GraphQLError } from "graphql";
 import { IntrospectionResult } from "./utils";
 
 export function introspect(
@@ -13,18 +13,37 @@ export function introspect(
     graphQLErrors.push(new GraphQLError(`couldn't build schema from sdl: ${e}. ${e.message}`));
   }
 
-  if (graphQLErrors.length > 0) {
-    return {
-      errors: graphQLErrors
-    };
-  }
   if (!graphqlSchemaObj) {
     return {
-      errors: [new GraphQLError("couldn't build a valid schema from sdl.")]
-    };
+      errors: graphQLErrors
+    }
   }
 
+  let introspectionResult;
+  try {
+    introspectionResult = graphqlSync(graphqlSchemaObj, getIntrospectionQuery());
+  } catch (e) {
+    graphQLErrors.push(new GraphQLError(`couldn't run introspection query on schema: ${e}. ${e.message}`));
+  }
+
+  if (!introspectionResult) {
+    return {
+      errors: graphQLErrors
+    }
+  }
+
+  if (introspectionResult.errors) {
+    return {
+      errors: [...introspectionResult.errors],
+    }
+  }
+
+  if (!introspectionResult.data) {
+    return {
+      errors: [new GraphQLError("empty introspection query result")]
+    }
+  }
   return {
-    introspectionQueryResult: printIntrospectionSchema(graphqlSchemaObj)
-  };
+    introspectionQueryResult:  JSON.stringify(introspectionResult.data)
+  }
 }

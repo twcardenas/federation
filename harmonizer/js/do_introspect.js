@@ -16,10 +16,6 @@ if (!sdl) {
   throw new Error("Error in JS-Rust-land: sdl is empty.");
 }
 
-getMethods = (obj) => Object.getOwnPropertyNames(obj).filter(item => typeof obj[item] === 'function')
-
-
-
 try {
 
   /**
