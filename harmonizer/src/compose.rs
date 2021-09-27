@@ -124,9 +124,11 @@ pub fn compose(service_list: ServiceList) -> Result<String, Vec<CompositionError
 
 #[cfg(test)]
 mod tests {
+    use crate::compose::compose;
+
     #[test]
     fn it_works() {
-        use crate::compose::{compose, ServiceDefinition};
+        use crate::compose::ServiceDefinition;
 
         insta::assert_snapshot!(compose(vec![
             ServiceDefinition::new(
@@ -163,5 +165,22 @@ mod tests {
             )
         ])
         .unwrap());
+    }
+
+    #[test]
+    fn invalid_service_list() {
+        use crate::compose::CompositionError;
+
+        let expected_error = vec![
+            CompositionError {
+                message: Some("Type Query must define one or more fields.".to_string()),
+                extensions: None,
+            },
+            CompositionError {
+                message: Some("Enum type join__Graph must define one or more values.".to_string()),
+                extensions: None,
+            },
+        ];
+        assert_eq!(expected_error, compose(vec![]).unwrap_err());
     }
 }

@@ -100,9 +100,12 @@ impl Js {
                 .expect("unable to evaluate service list in JavaScript runtime");
         }
 
-        runtime
-            .execute(name, source)
-            .unwrap_or_else(|_| panic!("unable to invoke {} in JavaScript runtime", source));
+        runtime.execute(name, source).unwrap_or_else(|e| {
+            panic!(
+                "unable to invoke {} in JavaScript runtime \n {:?}",
+                source, e
+            )
+        });
 
         rx.recv().expect("channel remains open")
     }

@@ -30,5 +30,6 @@ composition implementation while we work toward something else.
 #![deny(missing_debug_implementations, nonstandard_style)]
 #![warn(missing_docs, future_incompatible, unreachable_pub, rust_2018_idioms)]
 pub mod compose;
+pub mod introspect;
 mod js;
 pub mod plan;
