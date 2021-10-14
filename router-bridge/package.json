@@ -14,6 +14,7 @@
   "author": "Apollo <opensource@apollographql.com>",
   "license": "MIT",
   "dependencies": {
+    "@apollo/query-planner": "file:../query-planner-js",
     "fast-text-encoding": "1.0.3",
     "whatwg-url": "9.1.0"
   },
