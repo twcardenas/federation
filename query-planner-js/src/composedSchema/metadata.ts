@@ -7,18 +7,21 @@ import {
 import { MultiMap } from '../utilities/MultiMap';
 
 declare module 'graphql' {
-  interface GraphQLSchemaExtensions {
+  export interface GraphQLSchemaExtensions {
     federation?: FederationSchemaMetadata;
   }
 
-  interface GraphQLObjectTypeExtensions {
+  export interface GraphQLObjectTypeExtensions<_TSource = any, _TContext = any> {
     federation?: FederationTypeMetadata;
   }
 
-  interface GraphQLFieldExtensions<
+  export interface GraphQLInterfaceTypeExtensions {
+    federation?: FederationTypeMetadata;
+  }
+  export interface GraphQLFieldExtensions<
     _TSource,
     _TContext,
-    _TArgs = { [argName: string]: any },
+    _TArgs,
   > {
     federation?: FederationFieldMetadata;
   }

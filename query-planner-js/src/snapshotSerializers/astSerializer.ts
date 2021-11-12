@@ -141,6 +141,9 @@ function remapSelections(
               }
             : undefined,
         };
-    }
+      default:
+        // TODO: check on this
+        throw new Error(`Unexpected selection kind: ${selection.kind}`);
+      }
   });
 }

@@ -13,19 +13,11 @@ import { specifiedSDLRules } from 'graphql/validation/specifiedRules';
 
 import {
   UniqueDirectivesPerLocationRule as UniqueDirectivesPerLocationRuleFromGraphqlJs,
+  UniqueTypeNamesRule as UniqueTypeNamesRuleFromGraphqlJs,
+  UniqueEnumValueNamesRule as UniqueEnumValueNamesRuleFromGraphqlJs,
+  PossibleTypeExtensionsRule as PossibleTypeExtensionsRuleFromGraphqlJs,
+  UniqueFieldDefinitionNamesRule as UniqueFieldDefinitionNamesRuleFromGraphqlJs,
 } from 'graphql';
-import {
-  UniqueTypeNames as UniqueTypeNamesFromGraphqlJs,
-} from 'graphql/validation/rules/UniqueTypeNames';
-import {
-  UniqueEnumValueNames as UniqueEnumValueNamesFromGraphqlJs,
-} from 'graphql/validation/rules/UniqueEnumValueNames';
-import {
-  PossibleTypeExtensions as PossibleTypeExtensionsFromGraphqlJs,
-} from 'graphql/validation/rules/PossibleTypeExtensions';
-import {
-  UniqueFieldDefinitionNames as UniqueFieldDefinitionNamesFromGraphqlJs,
-} from 'graphql/validation/rules/UniqueFieldDefinitionNames';
 
 /**
  * Then, we'll import our own validation rules to take the place of those that
@@ -42,10 +34,10 @@ import {
 
 const omit = [
   UniqueDirectivesPerLocationRuleFromGraphqlJs,
-  UniqueTypeNamesFromGraphqlJs,
-  UniqueEnumValueNamesFromGraphqlJs,
-  PossibleTypeExtensionsFromGraphqlJs,
-  UniqueFieldDefinitionNamesFromGraphqlJs,
+  UniqueTypeNamesRuleFromGraphqlJs,
+  UniqueEnumValueNamesRuleFromGraphqlJs,
+  PossibleTypeExtensionsRuleFromGraphqlJs,
+  UniqueFieldDefinitionNamesRuleFromGraphqlJs,
 ];
 
 export const compositionRules = specifiedSDLRules

@@ -57,13 +57,13 @@ import { DirectiveMetadata } from './DirectiveMetadata';
 import { getJoinDefinitions } from '../joinSpec';
 import { CoreDirective } from '../coreSpec';
 
-const EmptyQueryDefinition = {
+const EmptyQueryDefinition: TypeDefinitionNode = {
   kind: Kind.OBJECT_TYPE_DEFINITION,
   name: { kind: Kind.NAME, value: defaultRootOperationNameLookup.query },
   fields: [],
   serviceName: null,
 };
-const EmptyMutationDefinition = {
+const EmptyMutationDefinition: TypeDefinitionNode = {
   kind: Kind.OBJECT_TYPE_DEFINITION,
   name: { kind: Kind.NAME, value: defaultRootOperationNameLookup.mutation },
   fields: [],
@@ -442,7 +442,9 @@ export function buildSchemaFromDefinitionsAndExtensions({
     ],
   };
 
-  errors = validateSDL(definitionsDocument, schema, compositionRules);
+  errors = validateSDL(definitionsDocument, schema, compositionRules) as
+    | GraphQLError[]
+    | undefined;
 
   try {
     schema = extendSchema(schema, definitionsDocument, {
@@ -456,7 +458,9 @@ export function buildSchemaFromDefinitionsAndExtensions({
     definitions: Object.values(typeExtensionsMap).flat(),
   };
 
-  errors.push(...validateSDL(extensionsDocument, schema, compositionRules));
+  (errors ?? []).push(
+    ...validateSDL(extensionsDocument, schema, compositionRules),
+  );
 
   try {
     schema = extendSchema(schema, extensionsDocument, {
@@ -707,7 +711,7 @@ export function composeServices(services: ServiceDefinition[]): CompositionResul
 
   const { graphNameToEnumValueName } = getJoinDefinitions(services);
 
-  if (errors.length > 0) {
+  if (errors && errors.length > 0) {
     return { schema, errors };
   } else {
     return {

@@ -12,11 +12,13 @@ import {
   isObjectType,
   isInterfaceType,
   isInputObjectType,
+  GraphQLSchema,
 } from 'graphql';
 import { SDLValidationContext } from 'graphql/validation/ValidationContext';
-import { TypeMap } from 'graphql/type/schema';
 import { Maybe } from '../../types';
 import { diffTypeNodes, logServiceAndType } from '../../utils';
+
+type TypeMap = ReturnType<GraphQLSchema['getTypeMap']>;
 
 type TypeNodeWithFields = TypeDefinitionWithFields | TypeExtensionWithFields;
 

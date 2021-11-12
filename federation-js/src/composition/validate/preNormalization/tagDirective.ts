@@ -8,6 +8,7 @@ import {
   visit,
   BREAK,
   parse,
+  GraphQLError,
 } from 'graphql';
 import { KnownArgumentNamesOnDirectivesRule } from 'graphql/validation/rules/KnownArgumentNamesRule';
 import { ProvidedRequiredArgumentsOnDirectivesRule } from 'graphql/validation/rules/ProvidedRequiredArgumentsRule';
@@ -37,7 +38,12 @@ export const tagDirective = ({
     ProvidedRequiredArgumentsOnDirectivesRule,
   ];
 
-  const errors = validateSDL(typeDefs, undefined, directiveRules);
+  const errors = validateSDL(
+    typeDefs,
+    undefined,
+    directiveRules,
+    // v15 backcompat
+  ) as GraphQLError[];
 
   let tagDirectiveDefinition: DirectiveDefinitionNode | undefined;
   visit(typeDefs, {

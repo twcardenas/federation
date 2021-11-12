@@ -29,6 +29,7 @@ import {
   GraphQLField,
   GraphQLEnumValue,
   DEFAULT_DEPRECATION_REASON,
+  Kind,
 } from 'graphql';
 import type {
   FederationType,
@@ -462,7 +463,7 @@ function printBlock(items: string[], onNewLine?: boolean) {
     : '';
 }
 
-function printArgs(args: GraphQLArgument[], indentation = '') {
+function printArgs(args: GraphQLArgument[] | readonly GraphQLArgument[], indentation = '') {
   if (args.length === 0) {
     return '';
   }
@@ -515,7 +516,7 @@ function printDeprecated(reason: Maybe<string>): string {
     return '';
   }
   if (reason !== DEFAULT_DEPRECATION_REASON) {
-    const astValue = print({ kind: 'StringValue', value: reason });
+    const astValue = print({ kind: Kind.STRING, value: reason });
     return ` @deprecated(reason: ${astValue})`;
   }
   return ' @deprecated';
@@ -525,18 +526,18 @@ function printDeprecated(reason: Maybe<string>): string {
 // happen across v15 and v16.
 function printSpecifiedByURL(scalar: GraphQLScalarType): string {
   if (
-    scalar.specifiedByUrl == null &&
     // @ts-ignore (accomodate breaking change across 15.x -> 16.x)
+    scalar.specifiedByUrl == null &&
     scalar.specifiedByURL == null
   ) {
     return '';
   }
   const astValue = print({
-    kind: 'StringValue',
+    kind: Kind.STRING,
     value:
-      scalar.specifiedByUrl ??
       // @ts-ignore (accomodate breaking change across 15.x -> 16.x)
-      scalar.specifiedByURL,
+      scalar.specifiedByUrl
+      ?? scalar.specifiedByURL,
   });
   return ` @specifiedBy(url: ${astValue})`;
 }
