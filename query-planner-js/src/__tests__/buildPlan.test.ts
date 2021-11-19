@@ -2,6 +2,7 @@ import { astSerializer, queryPlanSerializer, QueryPlanner } from '@apollo/query-
 import { composeServices } from '@apollo/composition';
 import { buildSchema, operationFromDocument, Schema, ServiceDefinition } from '@apollo/federation-internals';
 import gql from 'graphql-tag';
+import { assert } from '@apollo/federation-internals';
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);
@@ -9,9 +10,10 @@ expect.addSnapshotSerializer(queryPlanSerializer);
 function composeAndCreatePlanner(...services: ServiceDefinition[]): [Schema, QueryPlanner] {
   const compositionResults = composeServices(services);
   expect(compositionResults.errors).toBeUndefined();
+  assert(compositionResults.schema, 'schema exists');
   return [
-    compositionResults.schema!.toAPISchema(),
-    new QueryPlanner(buildSchema(compositionResults.supergraphSdl!))
+    compositionResults.schema.toAPISchema(),
+    new QueryPlanner(buildSchema(compositionResults.supergraphSdl))
   ];
 }
 

@@ -176,7 +176,7 @@ function copyTypeReference(source: Type, dest: Schema): Type {
     default:
       const type = dest.type(source.name);
       assert(type, () => `Cannot find type ${source} in destination schema (with types: ${dest.types().join(', ')})`);
-      return type!;
+      return type;
   }
 }
 

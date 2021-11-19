@@ -1211,6 +1211,12 @@ export class Schema {
     return type && type.kind === kind ? type as T : undefined;
   }
 
+  demandType(name: string): NamedType {
+    const result = this.type(name);
+    assert(result, `Demanded type:'${name}' does not exist`);
+    return result;
+  }
+
   intType(): ScalarType {
     return this._builtInTypes.get('Int')! as ScalarType;
   }

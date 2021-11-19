@@ -21,6 +21,7 @@ import { ApolloGateway } from '..';
 import { ApolloServerBase as ApolloServer } from 'apollo-server-core';
 import { getFederatedTestingSchema } from './execution-utils';
 import { Schema, Operation, parseOperation, buildSchemaFromAST } from '@apollo/federation-internals';
+import { assert } from '@apollo/federation-internals';
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(queryPlanSerializer);
@@ -72,9 +73,9 @@ describe('executeQueryPlan', () => {
   }
 
   function spyOnEntitiesResolverInService(serviceName: string) {
-    const entitiesField = serviceMap[serviceName].schema
-      .getQueryType()!
-      .getFields()['_entities'];
+    const queryType = serviceMap[serviceName].schema.getQueryType();
+    assert(queryType, 'query type is undefined or null');
+    const entitiesField = queryType.getFields()['_entities'];
     return jest.spyOn(entitiesField, 'resolve');
   }
 

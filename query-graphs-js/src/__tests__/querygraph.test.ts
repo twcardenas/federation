@@ -1,4 +1,4 @@
-import { ObjectType } from "@apollo/federation-internals";
+import { ObjectType, assert } from "@apollo/federation-internals";
 import { FieldCollection, subgraphEnteringTransition } from "@apollo/query-graphs";
 import { namedEdges, testGraphFromSchemaString } from './testUtils';
 
@@ -41,7 +41,8 @@ test('building query graphs from schema handles object types', () => {
 
   expect(rootEdge.label()).toBe('t1');
   const schema = [...graph.sources.values()][0];
-  const t1Field = (schema.type('Query')! as ObjectType).field('t1')!;
+  const t1Field = (schema.type('Query') as ObjectType).field('t1');
+  assert(t1Field, 't1Field exists');
   expect(rootEdge.matchesSupergraphTransition(schema, new FieldCollection(t1Field))).toBe(true);
   expect(rootEdge.matchesSupergraphTransition(schema, subgraphEnteringTransition)).toBe(false);
 

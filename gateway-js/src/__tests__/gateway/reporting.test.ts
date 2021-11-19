@@ -12,6 +12,7 @@ import { ApolloGateway } from '../..';
 import { Plugin, Config, Refs } from 'pretty-format';
 import { Report, Trace } from 'apollo-reporting-protobuf';
 import { fixtures } from 'apollo-federation-integration-testsuite';
+import { assert } from '@apollo/federation-internals';
 
 // Normalize specific fields that change often (eg timestamps) to static values,
 // to make snapshot testing viable.  (If these helpers are more generally
@@ -198,27 +199,26 @@ describe('reporting', () => {
     // Some handwritten tests to capture salient properties.
     const statsReportKey = '# -\n{me{name{first last}}topProducts{name}}';
     expect(Object.keys(report.tracesPerQuery)).toStrictEqual([statsReportKey]);
-    expect(report.tracesPerQuery[statsReportKey]!.trace!.length).toBe(1);
-    const trace = report.tracesPerQuery[statsReportKey]!.trace![0]! as Trace;
+    expect(report.tracesPerQuery[statsReportKey]?.trace?.length).toBe(1);
+    const trace = report.tracesPerQuery[statsReportKey].trace?.[0];
+    assert(trace && trace instanceof Trace, 'trace must exist');
     // In the gateway, the root trace is just an empty node (unless there are errors).
-    expect(trace.root!.child).toStrictEqual([]);
+    expect(trace.root?.child).toStrictEqual([]);
     // The query plan has (among other things) a fetch against 'accounts' and a
     // fetch against 'product'.
     expect(trace.queryPlan).toBeTruthy();
-    const queryPlan = trace.queryPlan!;
-    expect(queryPlan.parallel).toBeTruthy();
-    expect(queryPlan.parallel!.nodes![0]!.fetch!.serviceName).toBe('accounts');
+    const queryPlan = trace.queryPlan;
+    expect(queryPlan?.parallel).toBeTruthy();
+    expect(queryPlan?.parallel?.nodes?.[0].fetch?.serviceName).toBe('accounts');
     expect(
-      queryPlan.parallel!.nodes![0]!.fetch!.trace!.root!.child![0]!
-        .responseName,
+      queryPlan?.parallel?.nodes?.[0]?.fetch?.trace?.root?.child?.[0].responseName,
     ).toBe('me');
-    expect(queryPlan.parallel!.nodes![1]!.sequence).toBeTruthy();
+    expect(queryPlan?.parallel?.nodes?.[1].sequence).toBeTruthy();
     expect(
-      queryPlan.parallel!.nodes![1]!.sequence!.nodes![0]!.fetch!.serviceName,
+      queryPlan?.parallel?.nodes?.[1].sequence?.nodes?.[0].fetch?.serviceName,
     ).toBe('product');
     expect(
-      queryPlan.parallel!.nodes![1]!.sequence!.nodes![0]!.fetch!.trace!.root!
-        .child![0].responseName,
+      queryPlan?.parallel?.nodes?.[1].sequence?.nodes?.[0].fetch?.trace?.root?.child?.[0].responseName,
     ).toBe('topProducts');
 
     expect(report).toMatchInlineSnapshot(`

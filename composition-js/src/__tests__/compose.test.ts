@@ -3,6 +3,8 @@ import { CompositionResult, composeServices, CompositionSuccess } from '../compo
 import gql from 'graphql-tag';
 import './matchers';
 
+const doPrintSchema = (schema?: Schema): string => schema ? printSchema(schema) : '';
+
 function assertCompositionSuccess(r: CompositionResult): asserts r is CompositionSuccess {
   if (r.errors) {
     throw new Error(`Expected composition to succeed but got errors:\n${r.errors.join('\n\n')}`);
@@ -15,7 +17,7 @@ function errorMessages(r: CompositionResult): string[] {
 
 // Returns [the supergraph schema, its api schema, the extracted subgraphs]
 function schemas(result: CompositionSuccess): [Schema, Schema, Subgraphs] {
-  // Note that we could user `result.schema`, but reparsing to ensure we don't lose anything with printing/parsing.
+  // Note that we could user `result.schema`, but re-parsing to ensure we don't lose anything with printing/parsing.
   const schema = buildSchema(result.supergraphSdl);
   expect(schema.isCoreSchema()).toBeTruthy();
   return [schema, schema.toAPISchema(), extractSubgraphsFromSupergraph(schema)];
@@ -107,7 +109,7 @@ describe('composition', () => {
     `);
 
     const [_, api] = schemas(result);
-    expect(printSchema(api)).toMatchString(`
+    expect(doPrintSchema(api)).toMatchString(`
       type Query {
         t: T
       }
@@ -160,7 +162,7 @@ describe('composition', () => {
     assertCompositionSuccess(result);
 
     const [_, api] = schemas(result);
-    expect(printSchema(api)).toMatchString(`
+    expect(doPrintSchema(api)).toMatchString(`
       """A cool schema"""
       schema {
         query: Query
@@ -219,7 +221,7 @@ describe('composition', () => {
     assertCompositionSuccess(result);
 
     const [_, api, subgraphs] = schemas(result);
-    expect(printSchema(api)).toMatchString(`
+    expect(doPrintSchema(api)).toMatchString(`
       type Product {
         sku: String!
         name: String!
@@ -234,8 +236,7 @@ describe('composition', () => {
         email: String!
       }
     `);
-
-    expect(printSchema(subgraphs.get('subgraphA')!.schema)).toMatchString(`
+    expect(doPrintSchema(subgraphs.get('subgraphA')?.schema)).toMatchString(`
       type Product {
         sku: String!
         name: String!
@@ -246,7 +247,7 @@ describe('composition', () => {
       }
     `);
 
-    expect(printSchema(subgraphs.get('subgraphB')!.schema)).toMatchString(`
+    expect(doPrintSchema(subgraphs.get('subgraphB')?.schema)).toMatchString(`
       type User {
         name: String
         email: String!
@@ -283,7 +284,7 @@ describe('composition', () => {
     assertCompositionSuccess(result);
 
     const [_, api, subgraphs] = schemas(result);
-    expect(printSchema(api)).toMatchString(`
+    expect(doPrintSchema(api)).toMatchString(`
       type Product {
         sku: String!
         name: String!
@@ -295,7 +296,7 @@ describe('composition', () => {
     `);
 
     // Of course, the federation directives should be rebuilt in the extracted subgraphs.
-    expect(printSchema(subgraphs.get('subgraphA')!.schema)).toMatchString(`
+    expect(doPrintSchema(subgraphs.get('subgraphA')?.schema)).toMatchString(`
       type Product
         @key(fields: "sku")
       {
@@ -308,7 +309,7 @@ describe('composition', () => {
       }
     `);
 
-    expect(printSchema(subgraphs.get('subgraphB')!.schema)).toMatchString(`
+    expect(doPrintSchema(subgraphs.get('subgraphB')?.schema)).toMatchString(`
       type Product
         @key(fields: "sku")
       {
@@ -349,7 +350,7 @@ describe('composition', () => {
       assertCompositionSuccess(result);
 
       const [_, api, subgraphs] = schemas(result);
-      expect(printSchema(api)).toMatchString(`
+      expect(doPrintSchema(api)).toMatchString(`
         type Product {
           sku: String!
           name: String!
@@ -361,7 +362,7 @@ describe('composition', () => {
         }
       `);
 
-      expect(printSchema(subgraphs.get('subgraphA')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphA')?.schema)).toMatchString(`
         type Product
           @key(fields: "sku")
         {
@@ -380,7 +381,7 @@ describe('composition', () => {
       // being that it's the only thing we truly need as the handling of @external on
       // key fields of extension differs from that of non-extension, but nothing else
       // does).
-      expect(printSchema(subgraphs.get('subgraphB')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphB')?.schema)).toMatchString(`
         type Product {
           sku: String!
           price: Int!
@@ -422,7 +423,7 @@ describe('composition', () => {
       assertCompositionSuccess(result);
 
       const [_, api, subgraphs] = schemas(result);
-      expect(printSchema(api)).toMatchString(`
+      expect(doPrintSchema(api)).toMatchString(`
         type Product {
           sku: String!
           price: Int!
@@ -434,8 +435,8 @@ describe('composition', () => {
         }
       `);
 
-      // Same remark than in prevoius test
-      expect(printSchema(subgraphs.get('subgraphA')!.schema)).toMatchString(`
+      // Same remark than in previous test
+      expect(doPrintSchema(subgraphs.get('subgraphA')?.schema)).toMatchString(`
         type Product {
           sku: String!
           price: Int!
@@ -445,7 +446,7 @@ describe('composition', () => {
           @key(fields: "sku")
       `);
 
-      expect(printSchema(subgraphs.get('subgraphB')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphB')?.schema)).toMatchString(`
         type Product
           @key(fields: "sku")
         {
@@ -498,7 +499,7 @@ describe('composition', () => {
       assertCompositionSuccess(result);
 
       const [_, api, subgraphs] = schemas(result);
-      expect(printSchema(api)).toMatchString(`
+      expect(doPrintSchema(api)).toMatchString(`
         type Product {
           sku: String!
           price: Int!
@@ -511,7 +512,7 @@ describe('composition', () => {
         }
       `);
 
-      expect(printSchema(subgraphs.get('subgraphA')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphA')?.schema)).toMatchString(`
         type Product {
           sku: String!
           price: Int!
@@ -521,7 +522,7 @@ describe('composition', () => {
           @key(fields: "sku")
       `);
 
-      expect(printSchema(subgraphs.get('subgraphB')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphB')?.schema)).toMatchString(`
         type Product {
           sku: String!
           name: String!
@@ -532,7 +533,7 @@ describe('composition', () => {
         }
       `);
 
-      expect(printSchema(subgraphs.get('subgraphC')!.schema)).toMatchString(`
+      expect(doPrintSchema(subgraphs.get('subgraphC')?.schema)).toMatchString(`
         type Product {
           sku: String!
           color: String!
@@ -640,7 +641,7 @@ describe('composition', () => {
 
         const [_, api] = schemas(result);
         // We expect `f` to be nullable.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type Query {
             T: T!
           }
@@ -701,7 +702,7 @@ describe('composition', () => {
 
         const [_, api, subgraphs] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type A implements I {
             a: Int
             b: Int
@@ -727,11 +728,11 @@ describe('composition', () => {
         `);
 
         // Making sure we properly extract the type of `f` for both subgraphs
-        const fInA = (subgraphs.get('subgraphA')!.schema.type('T')! as ObjectType).field('f');
+        const fInA = (subgraphs.get('subgraphA')?.schema.type('T') as ObjectType).field('f');
         expect(fInA).toBeDefined();
         expect(fInA?.type?.toString()).toBe('I');
 
-        const fInB = (subgraphs.get('subgraphB')!.schema.type('T')! as ObjectType).field('f');
+        const fInB = (subgraphs.get('subgraphB')?.schema.type('T') as ObjectType).field('f');
         expect(fInB).toBeDefined();
         expect(fInB?.type?.toString()).toBe('A');
       });
@@ -780,7 +781,7 @@ describe('composition', () => {
 
         const [_, api, subgraphs] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type A {
             a: Int
           }
@@ -802,11 +803,11 @@ describe('composition', () => {
         `);
 
         // Making sur we properly extract the type of `f` for both subgraphs
-        const fInA = (subgraphs.get('subgraphA')!.schema.type('T')! as ObjectType).field('f');
+        const fInA = (subgraphs.get('subgraphA')?.schema.type('T') as ObjectType).field('f');
         expect(fInA).toBeDefined();
         expect(fInA?.type?.toString()).toBe('U');
 
-        const fInB = (subgraphs.get('subgraphB')!.schema.type('T')! as ObjectType).field('f');
+        const fInB = (subgraphs.get('subgraphB')?.schema.type('T') as ObjectType).field('f');
         expect(fInB).toBeDefined();
         expect(fInB?.type?.toString()).toBe('A');
       });
@@ -862,7 +863,7 @@ describe('composition', () => {
 
         const [_, api, subgraphs] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type A implements I {
             a: Int
             b: Int
@@ -888,11 +889,11 @@ describe('composition', () => {
         `);
 
         // Making sur we properly extract the type of `f` for both subgraphs
-        const fInA = (subgraphs.get('subgraphA')!.schema.type('T')! as ObjectType).field('f');
+        const fInA = (subgraphs.get('subgraphA')?.schema.type('T') as ObjectType).field('f');
         expect(fInA).toBeDefined();
         expect(fInA?.type?.toString()).toBe('I');
 
-        const fInB = (subgraphs.get('subgraphB')!.schema.type('T')! as ObjectType).field('f');
+        const fInB = (subgraphs.get('subgraphB')?.schema.type('T') as ObjectType).field('f');
         expect(fInB).toBeDefined();
         expect(fInB?.type?.toString()).toBe('A!');
       });
@@ -948,7 +949,7 @@ describe('composition', () => {
 
         const [_, api, subgraphs] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type A implements I {
             a: Int
             b: Int
@@ -974,11 +975,11 @@ describe('composition', () => {
         `);
 
         // Making sur we properly extract the type of `f` for both subgraphs
-        const fInA = (subgraphs.get('subgraphA')!.schema.type('T')! as ObjectType).field('f');
+        const fInA = (subgraphs.get('subgraphA')?.schema.type('T') as ObjectType).field('f');
         expect(fInA).toBeDefined();
         expect(fInA?.type?.toString()).toBe('[I]');
 
-        const fInB = (subgraphs.get('subgraphB')!.schema.type('T')! as ObjectType).field('f');
+        const fInB = (subgraphs.get('subgraphB')?.schema.type('T') as ObjectType).field('f');
         expect(fInB).toBeDefined();
         expect(fInB?.type?.toString()).toBe('[A!]');
       });
@@ -1034,7 +1035,7 @@ describe('composition', () => {
 
         const [_, api, subgraphs] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type A implements I {
             a: Int
             b: Int
@@ -1060,11 +1061,11 @@ describe('composition', () => {
         `);
 
         // Making sur we properly extract the type of `f` for both subgraphs
-        const fInA = (subgraphs.get('subgraphA')!.schema.type('T')! as ObjectType).field('f');
+        const fInA = (subgraphs.get('subgraphA')?.schema.type('T') as ObjectType).field('f');
         expect(fInA).toBeDefined();
         expect(fInA?.type?.toString()).toBe('I!');
 
-        const fInB = (subgraphs.get('subgraphB')!.schema.type('T')! as ObjectType).field('f');
+        const fInB = (subgraphs.get('subgraphB')?.schema.type('T') as ObjectType).field('f');
         expect(fInB).toBeDefined();
         expect(fInB?.type?.toString()).toBe('A!');
       });
@@ -1165,7 +1166,7 @@ describe('composition', () => {
 
         const [_, api] = schemas(result);
         // We expect `f(x:)` to be non-nullable.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type Query {
             T: T!
           }
@@ -1209,7 +1210,7 @@ describe('composition', () => {
 
         const [_, api] = schemas(result);
         // We expect `f` to be `I` as that is the supertype between itself and `A`.
-        expect(printSchema(api)).toMatchString(`
+        expect(doPrintSchema(api)).toMatchString(`
           type Query {
             T: T!
           }
@@ -1341,7 +1342,7 @@ describe('composition', () => {
     assertCompositionSuccess(result);
 
     const [_, api] = schemas(result);
-    expect(printSchema(api)).toMatchString(`
+    expect(doPrintSchema(api)).toMatchString(`
       type Query {
         t: T
       }

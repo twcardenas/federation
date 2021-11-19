@@ -7,7 +7,7 @@
  * @param message
  * @throws
  */
-export function assert(condition: any, message: string | (() => string)): asserts condition {
+export function assert(condition: unknown, message: string | (() => string)): asserts condition {
   if (!condition) {
     throw new Error(typeof message === 'string' ? message : message());
   }

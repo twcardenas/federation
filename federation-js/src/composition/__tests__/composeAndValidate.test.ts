@@ -10,8 +10,12 @@ import {
   graphqlErrorSerializer,
   gql,
 } from 'apollo-federation-integration-testsuite';
-import { ObjectType, printSchema, printType } from '@apollo/federation-internals';
+import { ObjectType, printSchema, printType, Schema, NamedType } from '@apollo/federation-internals';
 import { composeServices, CompositionResult } from '@apollo/composition';
+import { assert } from '@apollo/federation-internals';
+
+const doPrintSchema = (schema?: Schema): string => schema ? printSchema(schema) : '';
+const doPrintType = (type?: NamedType): string => type ? printType(type) : '';
 
 expect.addSnapshotSerializer(astSerializer);
 expect.addSnapshotSerializer(typeSerializer);
@@ -100,7 +104,7 @@ function permutateList<T>(inputArr: T[]) {
 }
 
 function getAndPrintType(name: string, compositionResult: CompositionResult): ASTNode {
-  return parse(printType(compositionResult.schema!.toAPISchema().type(name)!));
+  return parse(doPrintType(compositionResult.schema?.toAPISchema().type(name)));
 }
 
 it('composes and validates all (24) permutations without error', () => {
@@ -131,13 +135,10 @@ describe('unknown types', () => {
       name: 'serviceA',
     };
 
-    let compositionResult: CompositionResult;
-    expect(
-      () => (compositionResult = composeServices([serviceA])),
-    ).not.toThrow();
+    const compositionResult = composeServices([serviceA]);
 
-    expect(compositionResult!.errors).toBeDefined();
-    const { errors } = compositionResult!;
+    expect(compositionResult.errors).toBeDefined();
+    const { errors } = compositionResult;
     expect(errors).toMatchInlineSnapshot(`
           Array [
             Object {
@@ -167,7 +168,7 @@ describe('unknown types', () => {
 
     const compositionResult = composeServices([inventory]);
     expect(compositionResult.errors).toBeDefined();
-    expect(compositionResult.errors![0]).toMatchInlineSnapshot(`
+    expect(compositionResult.errors?.[0]).toMatchInlineSnapshot(`
       Object {
         "code": "EXTENSION_WITH_NO_BASE",
         "locations": Array [
@@ -514,7 +515,7 @@ describe('composition of value types', () => {
 
       expect(compositionResult.errors).toBeDefined();
       expect(compositionResult.errors).toHaveLength(1);
-      expect(compositionResult.errors![0]).toMatchInlineSnapshot(`
+      expect(compositionResult.errors?.[0]).toMatchInlineSnapshot(`
         Object {
           "code": "VALUE_TYPE_NO_ENTITY",
           "locations": Array [
@@ -566,7 +567,7 @@ describe('composition of value types', () => {
 
       expect(compositionResult.errors).toBeDefined();
       expect(compositionResult.errors).toHaveLength(1);
-      expect(compositionResult.errors![0]).toMatchInlineSnapshot(`
+      expect(compositionResult.errors?.[0]).toMatchInlineSnapshot(`
         Object {
           "code": "VALUE_TYPE_FIELD_TYPE_MISMATCH",
           "locations": Array [
@@ -616,7 +617,7 @@ describe('composition of value types', () => {
       const compositionResult = composeServices([serviceA, serviceB]);
       expect(compositionResult.errors).toBeDefined();
       expect(compositionResult.errors).toHaveLength(1);
-      expect(compositionResult.errors![0]).toMatchInlineSnapshot(`
+      expect(compositionResult.errors?.[0]).toMatchInlineSnapshot(`
         Object {
           "code": "TYPE_KIND_MISMATCH",
           "locations": Array [
@@ -677,7 +678,7 @@ describe('composition of value types', () => {
       const compositionResult = composeServices([serviceA, serviceB]);
       expect(compositionResult.errors).toBeDefined();
       expect(compositionResult.errors).toHaveLength(1);
-      expect(compositionResult.errors![0]).toMatchInlineSnapshot(`
+      expect(compositionResult.errors?.[0]).toMatchInlineSnapshot(`
         Object {
           "code": "VALUE_TYPE_UNION_TYPES_MISMATCH",
           "locations": Array [
@@ -766,9 +767,9 @@ describe('composition of value types', () => {
 
     expect(compositionResult.errors).toBeUndefined();
     const { schema, supergraphSdl } = compositionResult;
-    expect([...(schema!.type('Product') as ObjectType).interfaces()]).toHaveLength(2);
+    expect([...(schema?.type('Product') as ObjectType).interfaces()]).toHaveLength(2);
 
-    expect(printSchema(schema!)).toContain(
+    expect(doPrintSchema(schema)).toContain(
       'type Product implements Named & Node',
     );
     expect(supergraphSdl).toContain('type Product implements Named & Node');
@@ -822,7 +823,8 @@ describe('composition of schemas with directives', () => {
     };
 
     const compositionResult = composeServices([serviceA, serviceB]);
-    const schema = compositionResult.schema!;
+    const schema = compositionResult.schema;
+    assert(schema, 'schema should not be null');
 
     expect(compositionResult.errors).toBeUndefined();
 
@@ -832,7 +834,7 @@ describe('composition of schemas with directives', () => {
     const transparency = schema.directive('transparency');
     expect(transparency).toBeUndefined();
 
-    const type = schema.type('EarthConcern')! as ObjectType;
+    const type = schema.type('EarthConcern') as ObjectType;
     // Note that the schema is the supergraph. Stuffs _will_ have applied directives, `join__` ones,
     // so we just check it doesn't have the `@transparency` one.
     expect(type.appliedDirectivesOf('transparency')).toHaveLength(0);
@@ -872,23 +874,28 @@ describe('composition of schemas with directives', () => {
 
     const compositionResult = composeServices([serviceA]);
     expect(compositionResult.errors).toBeUndefined();
-    const schema = compositionResult.schema!;
+    const schema = compositionResult.schema;
+    assert(schema, 'schema should not be null');
 
     const deprecated = schema.directive('deprecated');
     expect(deprecated?.toString()).toMatchInlineSnapshot(`"@deprecated"`);
 
     const queryType = schema.type('Query') as ObjectType;
-    const field = queryType.field('importantDirectives')!;
+    const field = queryType.field('importantDirectives');
+    assert(field, 'field should not be null');
+    assert(deprecated, 'deprecated should not be null');
 
-    const application = field.appliedDirectivesOf(deprecated!);
+    const application = field.appliedDirectivesOf(deprecated);
     expect(application).toHaveLength(1);
     expect(application[0].arguments()['reason']).toEqual(deprecationReason);
 
     if (isAtLeastGraphqlVersionFifteenPointOne) {
       const specifiedBy = schema.directive('specifiedBy');
       expect(specifiedBy?.toString()).toMatchInlineSnapshot(`"@specifiedBy"`);
-      const customScalar = schema.type('MyScalar')!;
-      const specifiedByApplication = customScalar.appliedDirectivesOf(specifiedBy!);
+      const customScalar = schema.type('MyScalar');
+      assert(specifiedBy, 'specifiedBy should not be null');
+      assert(customScalar, 'customScalar should not be null');
+      const specifiedByApplication = customScalar.appliedDirectivesOf(specifiedBy);
       expect(specifiedByApplication).toHaveLength(1);
       expect(specifiedByApplication[0].arguments()['url']).toEqual(specUrl);
     }

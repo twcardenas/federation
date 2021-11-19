@@ -16,6 +16,7 @@ import { defaultPrintOptions, printSchema } from '../../dist/print';
 import { buildSchema } from '../../dist/buildSchema';
 import { federationBuiltIns } from '../../dist/federation';
 import './matchers';
+import { assert } from '@apollo/federation-internals';
 
 function parseSchema(schema: string, builtIns?: BuiltIns): Schema {
   try {
@@ -26,30 +27,30 @@ function parseSchema(schema: string, builtIns?: BuiltIns): Schema {
 }
 
 function expectObjectType(type?: Type): asserts type is ObjectType {
-  expect(type).toBeDefined();
-  expect(type!.kind).toBe('ObjectType');
+  assert(type, 'type should be defined');
+  expect(type.kind).toBe('ObjectType');
 }
 
 function expectInterfaceType(type?: Type): asserts type is InterfaceType {
-  expect(type).toBeDefined();
-  expect(type!.kind).toBe('InterfaceType');
+  assert(type, 'type should be defined');
+  expect(type.kind).toBe('InterfaceType');
 }
 
 function expectUnionType(type?: Type): asserts type is UnionType {
-  expect(type).toBeDefined();
-  expect(type!.kind).toBe('UnionType');
+  assert(type, 'type should be defined');
+  expect(type.kind).toBe('UnionType');
 }
 
 function expectEnumType(type?: Type): asserts type is EnumType {
-  expect(type).toBeDefined();
-  expect(type!.kind).toBe('EnumType');
+  assert(type, 'type should be defined');
+  expect(type.kind).toBe('EnumType');
 }
 
 declare global {
   namespace jest {
     interface Matchers<R> {
       toHaveField(name: string, type?: Type): R;
-      toHaveDirective<TArgs extends {[key: string]: any}>(directive: DirectiveDefinition<TArgs>, args?: TArgs): R;
+      toHaveDirective<TArgs extends {[key: string]: unknown}>(directive: DirectiveDefinition<TArgs>, args?: TArgs): R;
     }
   }
 }
@@ -81,7 +82,7 @@ expect.extend({
     }
   },
 
-  toHaveDirective(element: SchemaElement<any, any>, definition: DirectiveDefinition, args?: Record<string, any>) {
+  toHaveDirective(element: SchemaElement<any, any>, definition: DirectiveDefinition, args?: Record<string, unknown>) {
     const directives = element.appliedDirectivesOf(definition);
     if (directives.length == 0) {
       return {
@@ -122,7 +123,7 @@ test('building a simple schema programatically', () => {
   typeA.addField('q', queryType);
   typeA.applyDirective(key, { fields: 'a'});
 
-  expect(queryType).toBe(schema.schemaDefinition.root('query')!.type);
+  expect(queryType).toBe(schema.schemaDefinition.root('query')?.type);
   expect(queryType).toHaveField('a', typeA);
   expect(typeA).toHaveField('q', queryType);
   expect(typeA).toHaveDirective(key, { fields: 'a'});
@@ -148,19 +149,21 @@ test('parse schema and modify', () => {
     }`;
   const schema = parseSchema(sdl);
 
-  const queryType = schema.type('MyQuery')!;
-  const typeA = schema.type('A')!;
-  const inaccessibleDirective = schema.directive('inaccessible')!;
+  const queryType = schema.type('MyQuery');
+  const typeA = schema.type('A');
+  const inaccessibleDirective = schema.directive('inaccessible');
+  assert(inaccessibleDirective, 'inaccessible directive exists');
   expectObjectType(queryType);
   expectObjectType(typeA);
-  expect(schema.schemaDefinition.root('query')!.type).toBe(queryType);
+  expect(schema.schemaDefinition.root('query')?.type).toBe(queryType);
   expect(queryType).toHaveField('a', typeA);
   const f2 = typeA.field('f2');
   expect(f2).toHaveDirective(inaccessibleDirective);
   expect(printSchema(schema)).toMatchString(sdl);
 
-  expect(typeA).toHaveField('f1');
-  typeA.field('f1')!.remove();
+  const f1 = typeA.field('f1');
+  assert(f1, 'f1 exists on typeA field definition');
+  f1.remove();
   expect(typeA).not.toHaveField('f1');
 });
 
@@ -246,7 +249,8 @@ test('removal of all inaccessible elements of a schema', () => {
     directive @bar on ARGUMENT_DEFINITION | FIELD_DEFINITION
   `, federationBuiltIns);
 
-  const inaccessibleDirective = schema.directive('inaccessible')!;
+  const inaccessibleDirective = schema.directive('inaccessible');
+  assert(inaccessibleDirective, 'inaccessible directive exists');
   for (const element of schema.allNamedSchemaElement()) {
     if (element.hasAppliedDirective(inaccessibleDirective)) {
       element.remove();
@@ -452,7 +456,9 @@ test('handling of descriptions', () => {
   const longComment = "Something that explains what the product is. This can just be the title of the product, but this can be more than that if we want to. But it should be useful you know, otherwise our customer won't buy it.";
   const product = schema.type('Product');
   expectInterfaceType(product);
-  expect(product.field('description')!.description).toBe(longComment);
+  const description = product.field('description');
+  assert(description, 'description exists');
+  expect(description.description).toBe(longComment);
 
   expect(printSchema(schema)).toMatchString(sdl);
 });
@@ -561,26 +567,29 @@ test('default arguments for directives', () => {
   const schema = parseSchema(sdl);
   expect(printSchema(schema)).toMatchString(sdl);
 
-  const query = schema.schemaDefinition.root('query')!.type;
-  const exampleDirective = schema.directive('Example')!;
+  const queryObj = schema.schemaDefinition.root('query');
+  assert(queryObj, 'query root definition exists');
+  const query = queryObj.type;
+  const exampleDirective = schema.directive('Example');
+  assert(exampleDirective, 'example directive exists');
   expect(query).toHaveField('v1');
   expect(query).toHaveField('v2');
   expect(query).toHaveField('v3');
-  const v1 = query.field('v1')!;
-  const v2 = query.field('v2')!;
-  const v3 = query.field('v3')!;
+  const v1 = query.field('v1');
+  const v2 = query.field('v2');
+  const v3 = query.field('v3');
 
-  const d1 = v1.appliedDirectivesOf(exampleDirective)[0];
-  const d2 = v2.appliedDirectivesOf(exampleDirective)[0];
-  const d3 = v3.appliedDirectivesOf(exampleDirective)[0];
+  const d1 = v1?.appliedDirectivesOf(exampleDirective)[0];
+  const d2 = v2?.appliedDirectivesOf(exampleDirective)[0];
+  const d3 = v3?.appliedDirectivesOf(exampleDirective)[0];
 
-  expect(d1.arguments()).toEqual({});
-  expect(d2.arguments()).toEqual({ inputObject: {}});
-  expect(d3.arguments()).toEqual({ inputObject: { number: 3 }});
+  expect(d1?.arguments()).toEqual({});
+  expect(d2?.arguments()).toEqual({ inputObject: {}});
+  expect(d3?.arguments()).toEqual({ inputObject: { number: 3 }});
 
-  expect(d1.arguments(true)).toEqual({ inputObject: { number: 3 }});
-  expect(d2.arguments(true)).toEqual({ inputObject: { number: 3 }});
-  expect(d3.arguments(true)).toEqual({ inputObject: { number: 3 }});
+  expect(d1?.arguments(true)).toEqual({ inputObject: { number: 3 }});
+  expect(d2?.arguments(true)).toEqual({ inputObject: { number: 3 }});
+  expect(d3?.arguments(true)).toEqual({ inputObject: { number: 3 }});
 });
 
 test('correctly convert to a graphQL-js schema', () => {

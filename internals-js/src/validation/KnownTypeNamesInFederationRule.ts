@@ -34,7 +34,7 @@ export function KnownTypeNamesInFederationRule(
       const typeName = node.name.value;
       if (!existingTypesMap[typeName] && !definedTypes[typeName]) {
         const definitionNode = ancestors[2] ?? parent;
-        const isSDL = definitionNode != null && isSDLNode(definitionNode);
+        const isSDL = isSDLNode(definitionNode);
         if (isSDL && isStandardTypeName(typeName)) {
           return;
         }
