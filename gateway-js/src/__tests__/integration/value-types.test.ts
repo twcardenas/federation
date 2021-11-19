@@ -157,7 +157,7 @@ describe('value types', () => {
       }
     `);
 
-    const [furniture, , , , book] = data!.topProducts;
+    const [furniture, , , , book] = data?.topProducts;
 
     // Sanity check, referenceable ID
     expect(furniture.upc).toEqual('1');

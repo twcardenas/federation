@@ -98,7 +98,7 @@ it('Queries remote endpoints for their SDLs', async () => {
 
   gateway = new ApolloGateway({ serviceList: [simpleService] });
   await gateway.load();
-  expect(gateway.schema!.getType('User')!.description).toBe('This is my User');
+  expect(gateway.schema?.getType('User')?.description).toBe('This is my User');
 });
 
 // TODO(trevor:cloudconfig): Remove all usages of the experimental config option
@@ -380,7 +380,7 @@ describe('Downstream service health checks', () => {
       });
 
       await gateway.load();
-      expect(gateway.schema!.getType('User')!.description).toBe(
+      expect(gateway.schema?.getType('User')?.description).toBe(
         'This is my User',
       );
     });
@@ -443,7 +443,7 @@ describe('Downstream service health checks', () => {
       await gateway.load(mockApolloConfig);
       await gateway.stop();
 
-      expect(gateway.schema!.getType('User')!).toBeTruthy();
+      expect(gateway.schema?.getType('User')).toBeTruthy();
     });
 
     it('Rejects on initial load when health check fails', async () => {

@@ -65,7 +65,7 @@ describe('lifecycle hooks', () => {
     await gateway.load();
 
     expect(experimental_updateServiceDefinitions).toBeCalled();
-    expect(gateway.schema!.getType('Furniture')).toBeDefined();
+    expect(gateway.schema?.getType('Furniture')).toBeDefined();
     await gateway.stop();
   });
 
@@ -197,16 +197,16 @@ describe('lifecycle hooks', () => {
 
     const [firstCall, secondCall] = mockDidUpdate.mock.calls;
 
-    expect(firstCall[0]!.schema).toBeDefined();
-    expect(firstCall[0].compositionMetadata!.schemaHash).toEqual('hash1');
+    expect(firstCall[0].schema).toBeDefined();
+    expect(firstCall[0].compositionMetadata.schemaHash).toEqual('hash1');
     // first call should have no second "previous" argument
     expect(firstCall[1]).toBeUndefined();
 
     expect(secondCall[0].schema).toBeDefined();
-    expect(secondCall[0].compositionMetadata!.schemaHash).toEqual('hash2');
+    expect(secondCall[0].compositionMetadata.schemaHash).toEqual('hash2');
     // second call should have previous info in the second arg
-    expect(secondCall[1]!.schema).toBeDefined();
-    expect(secondCall[1]!.compositionMetadata!.schemaHash).toEqual('hash1');
+    expect(secondCall[1].schema).toBeDefined();
+    expect(secondCall[1].compositionMetadata.schemaHash).toEqual('hash1');
 
     await gateway.stop();
   });

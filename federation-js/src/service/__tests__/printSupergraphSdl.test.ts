@@ -4,6 +4,7 @@ import {
 } from 'apollo-federation-integration-testsuite';
 import { parse, GraphQLError, visit, StringValueNode } from 'graphql';
 import { composeServices } from '@apollo/composition';
+import { assert } from '@apollo/federation-internals';
 
 
 describe('printSupergraphSdl', () => {
@@ -23,7 +24,8 @@ describe('printSupergraphSdl', () => {
   });
 
   it('produces a parseable output', () => {
-    expect(() => parse(supergraphSdl!)).not.toThrow();
+    assert(supergraphSdl, 'supergraphSdl exists');
+    expect(() => parse(supergraphSdl)).not.toThrow();
   });
 
   it('prints a fully composed schema correctly', () => {
@@ -798,7 +800,8 @@ describe('printSupergraphSdl', () => {
   });
 
   it('fieldsets are parseable', () => {
-    const parsedSupergraphSdl = parse(supergraphSdl!);
+    assert(supergraphSdl, 'supergraphSdl exists');
+    const parsedSupergraphSdl = parse(supergraphSdl);
     const fieldSets: string[] = [];
 
     // Collect all args with the `key`, `provides`, and `requires` fields

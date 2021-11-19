@@ -1,6 +1,7 @@
 import { ObjectType } from '../definitions';
 import { buildSchema } from '../buildSchema';
 import { removeInaccessibleElements } from '../inaccessibleSpec';
+import { assert } from '..';
 
 describe('removeInaccessibleElements', () => {
   it(`removes @inaccessible fields`, () => {
@@ -29,8 +30,8 @@ describe('removeInaccessibleElements', () => {
 
     removeInaccessibleElements(schema);
 
-    const queryType = schema.schemaDefinition.rootType('query')!;
-
+    const queryType = schema.schemaDefinition.rootType('query');
+    assert(queryType, 'queryType exists');
     expect(queryType.field('someField')).toBeDefined();
     expect(queryType.field('privateField')).toBeUndefined();
   });
@@ -104,9 +105,10 @@ describe('removeInaccessibleElements', () => {
 
     expect(schema.type('Foo')).toBeUndefined();
     const barType = schema.type('Bar') as ObjectType | undefined;
+    assert(barType, 'barType exists');
     expect(barType).toBeDefined();
     expect(barType?.field('someField')).toBeDefined();
-    expect([...barType!.interfaces()]).toHaveLength(0);
+    expect([...barType.interfaces()]).toHaveLength(0);
   });
 
   it(`removes @inaccessible union types`, () => {

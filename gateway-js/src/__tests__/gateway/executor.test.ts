@@ -52,7 +52,7 @@ describe('ApolloGateway executor', () => {
       logger,
     });
 
-    expect(errors![0].message).toMatch(
+    expect(errors?.[0].message).toMatch(
       'Variable "$first" got invalid value "3";',
     );
   });

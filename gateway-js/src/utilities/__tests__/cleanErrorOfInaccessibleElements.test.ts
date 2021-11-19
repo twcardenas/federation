@@ -1,6 +1,7 @@
 import { execute, GraphQLError, parse } from "graphql";
 import { cleanErrorOfInaccessibleNames } from "../cleanErrorOfInaccessibleNames";
 import { buildSchema } from "@apollo/federation-internals";
+import { assert } from '@apollo/federation-internals';
 
 describe('cleanErrorOfInaccessibleNames', () => {
   const coreSchema = buildSchema(`
@@ -55,8 +56,8 @@ describe('cleanErrorOfInaccessibleNames', () => {
         someField: 'test',
       },
     });
-
-    const cleaned = cleanErrorOfInaccessibleNames(schema, result.errors![0]!);
+    assert(result.errors && result.errors.length > 0, 'result has errors');
+    const cleaned = cleanErrorOfInaccessibleNames(schema, result.errors[0]);
     expect(cleaned.message).toMatchInlineSnapshot(
       `"Abstract type \\"Foo\\" was resolve to a type [inaccessible type] that does not exist inside schema."`,
     );

@@ -112,7 +112,7 @@ it('Extracts service definitions from remote storage', async () => {
   await gateway.load({
     apollo: { keyHash: apiKeyHash, graphId, graphVariant: 'current' },
   });
-  expect(gateway.schema!.getType('User')!.description).toBe('This is my User');
+  expect(gateway.schema?.getType('User')?.description).toBe('This is my User');
 });
 
 function failNTimes(n: number, fn: () => nock.Interceptor) {
@@ -146,7 +146,7 @@ it(`Retries GCS (up to ${GCS_RETRY_COUNT} times) on failure for each request and
   await gateway.load({
     apollo: { keyHash: apiKeyHash, graphId, graphVariant: 'current' },
   });
-  expect(gateway.schema!.getType('User')!.description).toBe('This is my User');
+  expect(gateway.schema?.getType('User')?.description).toBe('This is my User');
 });
 
 describe('Managed mode', () => {
@@ -168,7 +168,7 @@ describe('Managed mode', () => {
     await gateway.load({
       apollo: { keyHash: apiKeyHash, graphId, graphVariant: 'current' },
     });
-    expect(gateway.schema!.getType('User')!.description).toBe(
+    expect(gateway.schema?.getType('User')?.description).toBe(
       'This is my User',
     );
   });
@@ -267,7 +267,7 @@ describe('Managed mode', () => {
       apollo: { keyHash: apiKeyHash, graphId, graphVariant: 'current' },
     });
 
-    expect(gateway.schema!.getType('User')!.description).toBe(
+    expect(gateway.schema?.getType('User')?.description).toBe(
       'This is my User',
     );
 
@@ -276,7 +276,7 @@ describe('Managed mode', () => {
     // At this point, the mock update should have been called but the schema
     // should not have updated to the new one.
     expect(mockUpdateSchema.mock.calls.length).toBe(2);
-    expect(gateway.schema!.getType('User')!.description).toBe(
+    expect(gateway.schema?.getType('User')?.description).toBe(
       'This is my User',
     );
   });
