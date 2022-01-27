@@ -6,6 +6,7 @@ import { err } from '@apollo/core-schema';
 import { assert } from './utils';
 
 export const coreIdentity = 'https://specs.apollo.dev/core';
+export const linkIdentity = 'https://specs.apollo.dev/link';
 
 export const ErrCoreCheckFailed = (causes: Error[]) =>
   err('CheckFailed', {
@@ -17,7 +18,6 @@ function buildError(message: string): Error {
   // Maybe not the right error for this?
   return new Error(message);
 }
-
 
 export const corePurposes = [
   'SECURITY' as const,
@@ -116,41 +116,55 @@ export abstract class FeatureDefinition {
   }
 }
 
+// Note that in practice, exactly one of 'url' and 'feature' should be set, but declaring both optional is
+// a tad more convenient in practice
 export type CoreDirectiveArgs = {
-  feature: string,
+  url?: string,
+  feature?: string,
   as?: string,
   for?: string
 }
 
 export function isCoreSpecDirectiveApplication(directive: Directive<SchemaDefinition, any>): directive is Directive<SchemaDefinition, CoreDirectiveArgs> {
+  console.log(`Cheking if core spec directive`);
   const definition = directive.definition;
   if (!definition) {
-    return false;
-  }
-  const featureArg = definition.argument('feature');
-  if (!featureArg || !sameType(featureArg.type!, new NonNullType(directive.schema().stringType()))) {
+    console.log(`No definition!`);
     return false;
   }
   const asArg = definition.argument('as');
   if (asArg && !sameType(asArg.type!, directive.schema().stringType())) {
+    console.log(`bad as`);
     return false;
   }
+  console.log(`Defintion is ${definition} with locations ${definition}`);
   if (!definition.repeatable || definition.locations.length !== 1 || definition.locations[0] !== DirectiveLocation.SCHEMA) {
+    console.log(`bad locations for the definition`);
+    return false;
+  }
+  const urlArg = definition.argument('url') ?? definition.argument('feature');
+  console.log(`url arg = ${urlArg}`);
+  if (!urlArg || !sameType(urlArg.type!, new NonNullType(directive.schema().stringType()))) {
     return false;
   }
 
-  const args = (directive as Directive<SchemaDefinition, CoreDirectiveArgs>).arguments();
+  const args = directive.arguments();
   try {
-    const url = FeatureUrl.parse(args.feature);
-    return url.identity === coreIdentity && directive.name === (args.as ?? 'core');
+    const url = FeatureUrl.parse(args[urlArg.name] as string);
+    console.log(`url = ${url}`);
+    if (url.identity == coreIdentity) {
+      return directive.name === (args.as ?? 'core');
+    } else {
+      return url.identity === linkIdentity &&  directive.name === (args.as ?? 'link');
+    }
   } catch (err) {
     return false;
   }
 }
 
 export class CoreSpecDefinition extends FeatureDefinition {
-  constructor(version: FeatureVersion) {
-    super(new FeatureUrl(coreIdentity, 'core', version));
+  constructor(version: FeatureVersion, identity: string = linkIdentity, name: string = 'link') {
+    super(new FeatureUrl(identity, name, version));
   }
 
   addElementsToSchema(_: Schema): void {
@@ -171,7 +185,7 @@ export class CoreSpecDefinition extends FeatureDefinition {
     const nameInSchema = as ?? this.url.name;
     const core = schema.addDirectiveDefinition(nameInSchema).addLocations(DirectiveLocation.SCHEMA);
     core.repeatable = true;
-    core.addArgument('feature', new NonNullType(schema.stringType()));
+    core.addArgument(this.urlArgName(), new NonNullType(schema.stringType()));
     core.addArgument('as', schema.stringType());
     if (this.supportPurposes()) {
       const purposeEnum = schema.addType(new EnumType(`${nameInSchema}__Purpose`));
@@ -183,7 +197,7 @@ export class CoreSpecDefinition extends FeatureDefinition {
 
     // Note: we don't use `applyFeatureToSchema` because it would complain the schema is not a core schema, which it isn't
     // until the next line.
-    const args: CoreDirectiveArgs = { feature: this.toString() }
+    const args: CoreDirectiveArgs = { [this.urlArgName()]: this.toString() }
     if (as) {
       args.as = as;
     }
@@ -218,17 +232,26 @@ export class CoreSpecDefinition extends FeatureDefinition {
 
   applyFeatureToSchema(schema: Schema, feature: FeatureDefinition, as?: string, purpose?: CorePurpose) {
     const coreDirective = this.coreDirective(schema);
-    const args: CoreDirectiveArgs = {
-      feature: feature.toString(),
+    const args = {
+      [this.urlArgName()]: feature.toString(),
       as,
-    };
+    } as CoreDirectiveArgs;
     if (this.supportPurposes() && purpose) {
       args.for = purpose;
     }
     schema.schemaDefinition.applyDirective(coreDirective, args);
     feature.addElementsToSchema(schema);
   }
+
+  extractFeatureUrl(args: CoreDirectiveArgs): FeatureUrl {
+    return FeatureUrl.parse(args[this.urlArgName()]!);
+  }
+
+  urlArgName(): 'feature' | 'url' {
+    return this.url.name === 'core' ? 'feature' : 'url';
+  }
 }
+
 
 export class FeatureDefinitions<T extends FeatureDefinition = FeatureDefinition> {
   // The list of definition corresponding to the known version of the particular feature this object handles,
@@ -463,9 +486,18 @@ export class FeatureUrl {
   }
 }
 
+export function findCoreSpecVersion(featureUrl: FeatureUrl): CoreSpecDefinition | undefined {
+  return featureUrl.name === 'core'
+    ? CORE_VERSIONS.find(featureUrl.version)
+    : (featureUrl.name === 'link' ? LINK_VERSIONS.find(featureUrl.version) : undefined)
+}
+
 export const CORE_VERSIONS = new FeatureDefinitions<CoreSpecDefinition>(coreIdentity)
-  .add(new CoreSpecDefinition(new FeatureVersion(0, 1)))
-  .add(new CoreSpecDefinition(new FeatureVersion(0, 2)));
+  .add(new CoreSpecDefinition(new FeatureVersion(0, 1), coreIdentity, 'core'))
+  .add(new CoreSpecDefinition(new FeatureVersion(0, 2), coreIdentity, 'core'));
+
+export const LINK_VERSIONS = new FeatureDefinitions<CoreSpecDefinition>(linkIdentity)
+  .add(new CoreSpecDefinition(new FeatureVersion(1, 0)));
 
 export function removeFeatureElements(schema: Schema, feature: CoreFeature) {
   // Removing directives first, so that when we remove types, the checks that there is no references don't fail due a directive of a the feature

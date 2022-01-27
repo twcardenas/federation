@@ -17,7 +17,7 @@ import {
   VariableDefinitionNode,
   VariableNode
 } from "graphql";
-import { CoreDirectiveArgs, CoreSpecDefinition, CORE_VERSIONS, FeatureUrl, isCoreSpecDirectiveApplication, removeFeatureElements } from "./coreSpec";
+import { CoreDirectiveArgs, CoreSpecDefinition, FeatureUrl, isCoreSpecDirectiveApplication, removeFeatureElements } from "./coreSpec";
 import { arrayEquals, assert, mapValues, MapWithCachedArrays, setValues } from "./utils";
 import { withDefaultValues, valueEquals, valueToString, valueToAST, variablesInValue, valueFromAST, valueNodeToConstValueNode } from "./values";
 import { removeInaccessibleElements } from "./inaccessibleSpec";
@@ -30,6 +30,7 @@ import { validateSDL } from "graphql/validation/validate";
 import { SDLValidationRule } from "graphql/validation/ValidationContext";
 import { specifiedSDLRules } from "graphql/validation/specifiedRules";
 import { validateSchema } from "./validate";
+import { findCoreSpecVersion } from ".";
 
 const validationErrorCode = 'GraphQLValidationFailed';
 
@@ -1052,9 +1053,9 @@ export class CoreFeatures {
 
   constructor(readonly coreItself: CoreFeature) {
     this.add(coreItself);
-    const coreDef = CORE_VERSIONS.find(coreItself.url.version);
+    const coreDef = findCoreSpecVersion(coreItself.url);
     if (!coreDef) {
-      throw error(`Schema uses unknown version ${coreItself.url.version} of the core spec (known versions: ${CORE_VERSIONS.versions().join(', ')})`);
+      throw error(`Schema uses unknown version ${coreItself.url.version} of the ${coreItself.url.name} spec`);
     }
     this.coreDefinition = coreDef;
   }
@@ -1080,7 +1081,7 @@ export class CoreFeatures {
       return undefined;
     }
     const args = (directive as Directive<SchemaDefinition, CoreDirectiveArgs>).arguments();
-    const url = FeatureUrl.parse(args.feature);
+    const url = this.coreDefinition.extractFeatureUrl(args);
     const existing = this.byIdentity.get(url.identity);
     if (existing) {
       throw error(`Duplicate inclusion of feature ${url.identity}`);
@@ -1478,12 +1479,12 @@ export class SchemaDefinition extends SchemaElement<SchemaDefinition, Schema>  {
     const coreFeatures = schema.coreFeatures;
     if (isCoreSpecDirectiveApplication(applied)) {
       if (coreFeatures) {
-        throw error(`Invalid duplicate application of the @core feature`);
+        throw error(`Invalid duplicate application of @core/@link`);
       }
       const schemaDirective = applied as Directive<SchemaDefinition, CoreDirectiveArgs>;
       const args = schemaDirective.arguments();
-      const url = FeatureUrl.parse(args.feature);
-      const core = new CoreFeature(url, args.as ?? 'core', schemaDirective, args.for);
+      const url = FeatureUrl.parse((args.url ?? args.feature)!);
+      const core = new CoreFeature(url, args.as ?? url.name, schemaDirective, args.for);
       Schema.prototype['markAsCoreSchema'].call(schema, core);
     } else if (coreFeatures) {
       CoreFeatures.prototype['maybeAddFeature'].call(coreFeatures, applied);

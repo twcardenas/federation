@@ -26,7 +26,7 @@ import {
   InputFieldDefinition,
   isCompositeType
 } from "./definitions";
-import { assert, joinStrings, MultiMap, OrderedMap } from "./utils";
+import { assert, joinStrings, MultiMap, printHumanReadableList, OrderedMap } from "./utils";
 import { SDLValidationRule } from "graphql/validation/ValidationContext";
 import { specifiedSDLRules } from "graphql/validation/specifiedRules";
 import {
@@ -54,7 +54,8 @@ import {
   ERRORS,
 } from "./error";
 import { computeShareables } from "./sharing";
-import { printHumanReadableList } from ".";
+import { CoreSpecDefinition, LINK_VERSIONS } from "./coreSpec";
+import { FEDERATION_VERSIONS } from "./federationSpec";
 
 export const entityTypeName = '_Entity';
 export const serviceTypeName = '_Service';
@@ -76,9 +77,9 @@ export const linkDirectiveName = 'link';
 export const serviceFieldName = '_service';
 export const entitiesFieldName = '_entities';
 
-const FEDERATION_SPEC_URL = 'https://specs.apollo.dev/federation/v2.0'
-
+const linkSpec = LINK_VERSIONS.latest();
 const tagSpec = TAG_VERSIONS.latest();
+const federationSpec = FEDERATION_VERSIONS.latest();
 
 // We don't let user use this as a subgraph name. That allows us to use it in `query graphs` to name the source of roots
 // in the "federated query graph" without worrying about conflict (see `FEDERATED_GRAPH_ROOT_SOURCE` in `querygraph.ts`).
@@ -359,9 +360,15 @@ function formatFieldsToReturnType([type, implems]: [string, FieldDefinition<Obje
 }
 
 function checkIfFed2Schema(schema: Schema): boolean {
-  // TODO: this is over-simple and needs to be updated
-  const linkDirectives = schema.schemaDefinition.appliedDirectivesOf(federationBuiltIns.linkDirective(schema));
-  return linkDirectives.some((d) => d.arguments().url === FEDERATION_SPEC_URL);
+  const core = schema.coreFeatures;
+  if (!core) {
+    console.log(`Not a core schema!!`);
+    return false
+  }
+
+  const federationFeature = core.getByIdentity(federationSpec.identity);
+  console.log(`fed feature = ${federationFeature}`);
+  return !!federationFeature && federationFeature.url.equals(federationSpec.url);
 }
 
 export class FederationMetadata {
@@ -469,6 +476,7 @@ export class FederationBuiltIns extends BuiltIns {
       .addLocations(DirectiveLocation.OBJECT, DirectiveLocation.FIELD_DEFINITION);
 
     const linkDirective = this.addBuiltInDirective(schema, linkDirectiveName).addLocations(DirectiveLocation.SCHEMA);
+    linkDirective.repeatable = true;
     linkDirective.addArgument("url", new NonNullType(schema.stringType()));
   }
 
@@ -711,23 +719,29 @@ export class FederationBuiltIns extends BuiltIns {
 export const federationBuiltIns = new FederationBuiltIns();
 
 export function setSchemaAsFed2Subgraph(schema: Schema) {
-  const linkDirective = federationBuiltIns.linkDirective(schema);
-  // We set the directive on a schema extension because the vast majority of subgraph don't
-  // have custom operations so it ends up looking cleaner/shorter to have
-  //   extend schema @link(...)
-  // at the beginning of the schema, rather:
-  //   schema @link(...) {
-  //     query: Query
-  //     mutation: Mutation
-  //   }
-  // As a minor aside, as federation subgraphs are allowed to be authored _without_ a Query
-  // type (one is automatically added for them ultimately by `buildSubgraphSchema`), using
-  // an extension also avoid confusing GraphQL-js in that case.
-  schema.schemaDefinition.applyDirective( linkDirective, { url: FEDERATION_SPEC_URL })
-    .setOfExtension(schema.schemaDefinition.newExtension());
+  let core = schema.coreFeatures;
+  let spec: CoreSpecDefinition;
+  if (core) {
+    spec = core.coreDefinition;
+    // We don't accept pre-1.0 @core: this avoid having to care about what the name
+    // of the argument below is, and why would be bother?
+    assert(spec.url.version.satisfies(linkSpec.version), `Fed2 schema must use @link with version >= 1.0, but schema uses ${spec.url}`);
+  } else {
+    linkSpec.addToSchema(schema);
+    spec = linkSpec;
+    core = schema.coreFeatures;
+    assert(core, 'Schema should now be a core schema');
+  }
+
+  assert(!core.getByIdentity(federationSpec.identity), 'Schema already set as a federation subgraph');
+  schema.schemaDefinition.applyDirective(
+    core.coreItself.nameInSchema,
+    { url: federationSpec.url.toString() }
+  );
 }
 
 export function asFed2SubgraphDocument(document: DocumentNode): DocumentNode {
+  // TODO: this is now broken. We really should be using buildSubgraphSchema().
   const fed2LinkExtension: SchemaExtensionNode = {
     kind: Kind.SCHEMA_EXTENSION,
     directives: [{
@@ -736,7 +750,7 @@ export function asFed2SubgraphDocument(document: DocumentNode): DocumentNode {
       arguments: [{
         kind: Kind.ARGUMENT,
         name: { kind: Kind.NAME, value: 'url' },
-        value: { kind: Kind.STRING, value: FEDERATION_SPEC_URL }
+        value: { kind: Kind.STRING, value: federationSpec.url.toString() }
       }]
     }]
   };
