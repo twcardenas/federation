@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::process::Command;
+use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-changed=js-src");
@@ -12,9 +13,21 @@ fn main() {
 
 fn update_bridge() {
     println!("cargo:warning=Updating router-bridge");
-    let npm = which::which("npm").unwrap();
+
+    let home_dir = std::env::var("HOME").unwrap();
     let current_dir = std::env::current_dir().unwrap();
     let repo_dir = current_dir.parent().unwrap();
+    let npm = which::which("npm")
+        .or_else(|_|{
+            let npm_asdf = PathBuf::from(format!("{}/.asdf/shims/npm", home_dir));
+            if npm_asdf.exists() {
+                Ok(npm_asdf)
+            }
+            else {
+                Err("Could not find npm")
+            }
+        })
+        .unwrap();
 
     assert!(Command::new(&npm)
         .current_dir(&repo_dir)
