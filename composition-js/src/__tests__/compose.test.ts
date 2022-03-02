@@ -495,6 +495,8 @@ describe('composition', () => {
         `);
       });
 
+      // Note that because currently we don't let shareable types have types with different possible runtime types merge, this means
+      // merging subtypes only truly work in relatively restricted cases like this one where the interface has a single implementation.
       it('merges interface subtypes', () => {
         const subgraphA = {
           name: 'subgraphA',
@@ -510,11 +512,6 @@ describe('composition', () => {
             type A implements I @shareable {
               a: Int
               b: Int
-            }
-
-            type B implements I {
-              a: Int
-              c: Int
             }
 
             type T @key(fields: "id") {
@@ -550,11 +547,6 @@ describe('composition', () => {
             b: Int
           }
 
-          type B implements I {
-            a: Int
-            c: Int
-          }
-
           interface I {
             a: Int
           }
@@ -579,6 +571,8 @@ describe('composition', () => {
         expect(fInB?.type?.toString()).toBe('A');
       });
 
+      // Note that because currently we don't let shareable types have types with different possible runtime types merge, this means
+      // merging subtypes only truly work in relatively restricted cases like this one where the union has a single member.
       it('merges union subtypes', () => {
         const subgraphA = {
           name: 'subgraphA',
@@ -587,14 +581,10 @@ describe('composition', () => {
               T: T!
             }
 
-            union U = A | B
+            union U = A
 
             type A @shareable {
               a: Int
-            }
-
-            type B {
-              b: Int
             }
 
             type T @key(fields: "id") {
@@ -628,10 +618,6 @@ describe('composition', () => {
             a: Int
           }
 
-          type B {
-            b: Int
-          }
-
           type Query {
             T: T!
           }
@@ -641,7 +627,7 @@ describe('composition', () => {
             f: U
           }
 
-          union U = A | B
+          union U = A
         `);
 
         // Making sur we properly extract the type of `f` for both subgraphs
@@ -671,11 +657,6 @@ describe('composition', () => {
             type A implements I @shareable {
               a: Int
               b: Int
-            }
-
-            type B implements I {
-              a: Int
-              c: Int
             }
 
             type T @key(fields: "id") {
@@ -711,11 +692,6 @@ describe('composition', () => {
             b: Int
           }
 
-          type B implements I {
-            a: Int
-            c: Int
-          }
-
           interface I {
             a: Int
           }
@@ -741,8 +717,7 @@ describe('composition', () => {
       });
 
       it('merges subtypes within lists', () => {
-        // This example merge types that differs both on interface subtyping
-        // and on nullability
+        // This example merge types that differs interface subtyping within lists
         const subgraphA = {
           name: 'subgraphA',
           typeDefs: gql`
@@ -757,11 +732,6 @@ describe('composition', () => {
             type A implements I @shareable {
               a: Int
               b: Int
-            }
-
-            type B implements I {
-              a: Int
-              c: Int
             }
 
             type T @key(fields: "id") {
@@ -797,11 +767,6 @@ describe('composition', () => {
             b: Int
           }
 
-          type B implements I {
-            a: Int
-            c: Int
-          }
-
           interface I {
             a: Int
           }
@@ -827,8 +792,7 @@ describe('composition', () => {
       });
 
       it('merges subtypes within non-nullable', () => {
-        // This example merge types that differs both on interface subtyping
-        // and on nullability
+        // This example merge types that differs both on interface subtyping and are non-nullable
         const subgraphA = {
           name: 'subgraphA',
           typeDefs: gql`
@@ -843,11 +807,6 @@ describe('composition', () => {
             type A implements I @shareable {
               a: Int
               b: Int
-            }
-
-            type B implements I {
-              a: Int
-              c: Int
             }
 
             type T @key(fields: "id") {
@@ -876,16 +835,11 @@ describe('composition', () => {
         assertCompositionSuccess(result);
 
         const [_, api, subgraphs] = schemas(result);
-        // We expect `f` to be `I` as that is the supertype between itself and `A`.
+        // We expect `f` to be `I!` as that is the supertype between itself and `A`.
         expect(printSchema(api)).toMatchString(`
           type A implements I {
             a: Int
             b: Int
-          }
-
-          type B implements I {
-            a: Int
-            c: Int
           }
 
           interface I {

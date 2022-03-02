@@ -1,23 +1,28 @@
 import {
   assert,
   CompositeType,
+  ERRORS,
   Field,
   FieldDefinition,
   FieldSelection,
   firstOf,
   FragmentElement,
   InputType,
+  isAbstractType,
   isLeafType,
   isNullableType,
+  joinStrings,
   MultiMap,
   newDebugLogger,
   Operation,
   operationToDocument,
+  printSubgraphNames,
   Schema,
   SchemaRootKind,
   Selection,
   selectionOfElement,
   SelectionSet,
+  sourceASTs,
   typenameFieldName,
   VariableDefinitions
 } from "@apollo/federation-internals";
@@ -48,7 +53,7 @@ import {
   SimultaneousPathsWithLazyIndirectPaths,
   advanceOptionsToString,
 } from "@apollo/query-graphs";
-import { print } from "graphql";
+import { GraphQLError, print } from "graphql";
 
 const debug = newDebugLogger('validation');
 
@@ -64,25 +69,40 @@ export class ValidationError extends Error {
   }
 }
 
-function validationError(
+
+function satisfiabilityError(
   unsatisfiablePath: RootPath<Transition>,
   subgraphsPaths: RootPath<Transition>[],
   subgraphsPathsUnadvanceables: Unadvanceables[]
-): ValidationError {
+): GraphQLError {
   const witness = buildWitnessOperation(unsatisfiablePath);
-
-  // TODO: we should build a more detailed error message, not just the unsatisfiable query. Doing that well is likely a tad
-  // involved though as there may be a lot of different reason why it doesn't validate. But by looking at the last edge on the
-  // supergraph and the subgraphsPath, we should be able to roughly infer what's going on.
   const operation = print(operationToDocument(witness));
   const message = `The following supergraph API query:\n${operation}\n`
     + 'cannot be satisfied by the subgraphs because:\n'
     + displayReasons(subgraphsPathsUnadvanceables);
-  return new ValidationError(message, unsatisfiablePath, subgraphsPaths, witness);
+  const error = new ValidationError(message, unsatisfiablePath, subgraphsPaths, witness);
+  return ERRORS.SATISFIABILITY_ERROR.err({
+    message: error.message,
+    originalError: error,
+  });
 }
 
-function isValidationError(e: any): e is ValidationError {
-  return e instanceof ValidationError;
+function shareableFieldMismatchedRuntimeTypesError(
+  invalidState: ValidationState,
+  field: FieldDefinition<CompositeType>,
+  runtimeTypesToSubgraphs: MultiMap<string, string>,
+): GraphQLError {
+  const witness = buildWitnessOperation(invalidState.supergraphPath);
+  const operation = print(operationToDocument(witness));
+  const typeStrings = [...runtimeTypesToSubgraphs].map(([t, subgraphs]) => `runtime types [${t}] in ${printSubgraphNames(subgraphs)}`);
+  const message = `For the following supergraph API query:\n${operation}\n`
+    + `shared field "${field.coordinate}" return type "${field.type}" has different possible runtime types across subgraphs: it has ${joinStrings(typeStrings, ' and ', ' but ')}.\n`;
+    + `This is not allowed as shared fields must resolve the same way in all subgraphs.`;
+  const error = new ValidationError(message, invalidState.supergraphPath, invalidState.subgraphPaths, witness);
+  return ERRORS.SHAREABLE_WITH_MISMATCHED_RUNTIME_TYPES.err({
+    message: error.message,
+    nodes: sourceASTs(...invalidState.currentSubgraphsSchema().map((s) => (s.type(field.parent.name) as CompositeType | undefined)?.field(field.name))),
+  });
 }
 
 function displayReasons(reasons: Unadvanceables[]): string {
@@ -214,12 +234,12 @@ function generateWitnessValue(type: InputType): any {
   }
 }
 
-export function validateGraphComposition(supergraph: QueryGraph, subgraphs: QueryGraph): {errors? : ValidationError[]} {
+export function validateGraphComposition(supergraph: QueryGraph, subgraphs: QueryGraph): {errors? : GraphQLError[]} {
   const errors = new ValidationTraversal(supergraph, subgraphs).validate();
   return errors.length > 0 ? {errors} : {};
 }
 
-export function computeSubgraphPaths(supergraphPath: RootPath<Transition>, subgraphs: QueryGraph): {traversal?: ValidationState, isComplete?: boolean, error?: ValidationError} {
+export function computeSubgraphPaths(supergraphPath: RootPath<Transition>, subgraphs: QueryGraph): {traversal?: ValidationState, isComplete?: boolean, error?: GraphQLError} {
   try {
     assert(!supergraphPath.hasAnyEdgeConditions(), () => `A supergraph path should not have edge condition paths (as supergraph edges should not have conditions): ${supergraphPath}`);
     const supergraphSchema = firstOf(supergraphPath.graph.sources.values())!;
@@ -233,14 +253,14 @@ export function computeSubgraphPaths(supergraphPath: RootPath<Transition>, subgr
         isIncomplete = true;
         break;
       }
-      if (isValidationError(updated)) {
+      if (updated instanceof GraphQLError) {
         throw updated;
       }
       state = updated;
     }
     return {traversal: state, isComplete: !isIncomplete};
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof GraphQLError) {
       return {error};
     }
     throw error;
@@ -255,6 +275,19 @@ function initialSubgraphPaths(kind: SchemaRootKind, subgraphs: QueryGraph): Root
     () => `Unexpected type ${root.type} for subgraphs root type (expected ${federatedGraphRootTypeName(kind)}`);
   const initialState = GraphPath.fromGraphRoot<Transition>(subgraphs, kind)!;
   return subgraphs.outEdges(root).map(e => initialState.add(subgraphEnteringTransition, e, noConditionsResolution));
+}
+
+function possibleRuntimeTypeNamesSorted(path: RootPath<Transition>): string[] {
+  const types = path.tailPossibleRuntimeTypes().map((o) => o.name);
+  types.sort((a, b) => a.localeCompare(b));
+  return types;
+}
+
+export function extractValidationError(error: any): ValidationError | undefined {
+  if (!(error instanceof GraphQLError) || !(error.originalError instanceof ValidationError)) {
+    return undefined;
+  }
+  return error.originalError;
 }
 
 export class ValidationState {
@@ -278,12 +311,12 @@ export class ValidationState {
     supergraphSchema: Schema,
     supergraphEdge: Edge,
     conditionResolver: ConditionValidationResolver
-  ): ValidationState | undefined | ValidationError {
+  ): ValidationState | undefined | GraphQLError {
     assert(!supergraphEdge.conditions, () => `Supergraph edges should not have conditions (${supergraphEdge})`);
 
     const transition = supergraphEdge.transition;
     const targetType = supergraphEdge.tail.type;
-    const newSubgraphPaths = [];
+    const newSubgraphPaths: RootPath<Transition>[] = [];
     const deadEnds: Unadvanceables[] = [];
     for (const path of this.subgraphPaths) {
       const options = advancePathWithTransition(
@@ -306,9 +339,78 @@ export class ValidationState {
     }
     const newPath = this.supergraphPath.add(transition, supergraphEdge, noConditionsResolution);
     if (newSubgraphPaths.length === 0) {
-      return validationError(newPath, this.subgraphPaths, deadEnds);
+      return satisfiabilityError(newPath, this.subgraphPaths, deadEnds);
     }
-    return new ValidationState(newPath, newSubgraphPaths);
+
+    const updatedState = new ValidationState(newPath, newSubgraphPaths);
+
+    // We also ensure that all options have the same set or possible runtime types. If that's not the case, this
+    // would essentially mean that we can resolve a shared field from multiple subgraphs, but not all those subgraphs
+    // have the same possible runtime implementations for that field return type. But as a shardd field *must* be
+    // resolved the same way in all subgraphs, this is a red flag. Let's illustrate with an example:
+    // - subgraph S1:
+    //     Query {
+    //       e: E!
+    //     }
+    //
+    //     type E @key(fields: "id") {
+    //       id: ID!
+    //       s: U! @shareable
+    //     }
+    //
+    //     union U = A | B
+    //
+    //     type A {
+    //       a: Int
+    //     }
+    //
+    //     type B {
+    //       b: Int
+    //     }
+    // - subgraph S2:
+    //     type E @key(fields: "id") {
+    //       id: ID!
+    //       s: U! @shareable
+    //     }
+    //
+    //     union U = A | C
+    //
+    //     type A {
+    //       a: Int
+    //     }
+    //
+    //     type C {
+    //       c: Int
+    //     }
+    // In this case, both subgraph should only ever resolve `s` into an object of type `A`. Because if S1 resolves `s` into an object of
+    // type B, there is no way S2 could resolve it "the same way" (and vice-versa for S2 resolving `s` into a `C` object).
+    // But given the return type of `s` is `U` in both case, this feel like something that is easy to get wrong.
+    // And so we reject this example. To be clear, this is a somewhat conservative rejection: it *is* possible to implement this example
+    // correctly (by only ever resolving `s` into a `A` object) and users should be aware that shareable field should resolve the
+    // same way in all the subgraphs where they are resolved. But allowing it feels fairly error prone and it's not that clear that it
+    // is that useful in practice, so we don't allow it for now.
+    //
+    // Note that if motivated user demand for allowing the example above arises and we're not worried about users getting this wrong, then
+    // we could relax this rule. But even then, we should probably at least reject the case where the sets of runtime types for all
+    // the sources don't intersect, since there would be no good way to implement such case.
+    if (newSubgraphPaths.length > 1 && isAbstractType(newSubgraphPaths[0].tail.type)) {
+      const runtimeTypesToSubgraphs = new MultiMap<string, string>();
+      for (const path of newSubgraphPaths) {
+        // Note: we add spacing between elements because we're going use it if we display an error. This doesn't impact our set equality though
+        // since type names can have neither comma or space in graphQL.
+        runtimeTypesToSubgraphs.add(possibleRuntimeTypeNamesSorted(path).join(', '), path.tail.source);
+      }
+
+      if (runtimeTypesToSubgraphs.size > 1) {
+        // The runtime types weren't diverging before this transition (since at the start of a query there is a single runtime type and we run this check
+        // on every transition afterwards), and "field collections" is the only transition that can change that (a `DownCast` on the same orignal set must
+        // give the same set, `KeyResolution` only applies to object types currently, ....).
+        assert(transition.kind === 'FieldCollection', () => `Unexpected runtime types divergence after ${transition}: [${newSubgraphPaths.map((p) => p.toString()).join(', ')}]`)
+        return shareableFieldMismatchedRuntimeTypesError(updatedState, transition.definition, runtimeTypesToSubgraphs);
+      }
+    }
+
+    return updatedState;
   }
 
   currentSubgraphs(): string[] {
@@ -320,6 +422,14 @@ export class ValidationState {
       }
     }
     return subgraphs;
+  }
+
+  currentSubgraphsSchema(): Schema[] {
+    if (this.subgraphPaths.length === 0) {
+      return [];
+    }
+    const sources = this.subgraphPaths[0].graph.sources;
+    return this.currentSubgraphs().map((s) => sources.get(s)!);
   }
 
   toString(): string {
@@ -342,7 +452,7 @@ class ValidationTraversal {
   // For a vertex, we may have multiple "sets of subgraphs", hence the double-array.
   private readonly previousVisits: QueryGraphState<string[][]>;
 
-  private readonly validationErrors: ValidationError[] = [];
+  private readonly validationErrors: GraphQLError[] = [];
 
   constructor(supergraph: QueryGraph, subgraphs: QueryGraph) {
     this.supergraphSchema = firstOf(supergraph.sources.values())!;
@@ -351,7 +461,7 @@ class ValidationTraversal {
     this.previousVisits = new QueryGraphState(supergraph);
   }
 
-  validate(): ValidationError[] {
+  validate(): GraphQLError[] {
     while (this.stack.length > 0) {
       this.handleState(this.stack.pop()!);
     }
@@ -391,7 +501,7 @@ class ValidationTraversal {
 
       debug.group(() => `Validating supergraph edge ${edge}`);
       const newState = state.validateTransition(this.supergraphSchema, edge, this.conditionResolver);
-      if (isValidationError(newState)) {
+      if (newState instanceof GraphQLError) {
         debug.groupEnd(`Validation error!`);
         this.validationErrors.push(newState);
         continue;

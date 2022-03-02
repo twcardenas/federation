@@ -301,6 +301,11 @@ const INVALID_LINK_DIRECTIVE_USAGE = makeCodeDefinition(
   'An application of the @link directive is invalid/does not respect the specification.'
 );
 
+const SHAREABLE_WITH_MISMATCHED_RUNTIME_TYPES = makeCodeDefinition(
+  'SHAREABLE_WITH_MISMATCHED_RUNTIME_TYPES',
+  'A shareable field return type have mismatched possible runtime types in the subgraphs in which the field is declared. As shared fields must resolve the same way in all subgraphs, this is almost surely a mistake.'
+);
+
 const SATISFIABILITY_ERROR = makeCodeDefinition(
   'SATISFIABILITY_ERROR',
   'Subgraphs can be merged, but the resulting supergraph API would have queries that cannot be satisfied by those subgraphs.',
@@ -359,6 +364,7 @@ export const ERRORS = {
   INTERFACE_FIELD_IMPLEM_TYPE_MISMATCH,
   INVALID_FIELD_SHARING,
   INVALID_LINK_DIRECTIVE_USAGE,
+  SHAREABLE_WITH_MISMATCHED_RUNTIME_TYPES,
   SATISFIABILITY_ERROR,
 };
 

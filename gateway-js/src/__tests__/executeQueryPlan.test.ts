@@ -2990,5 +2990,4 @@ describe('executeQueryPlan', () => {
         `);
     });
   });
-
 });

@@ -112,3 +112,57 @@ describe('@requires', () => {
     ]);
   });
 });
+
+
+it('errors if a shared field has different runtime types in different subgraphs', () => {
+  const subgraphA = {
+    name: 'A',
+    typeDefs: gql`
+      type Query {
+        a: A @shareable
+      }
+
+      interface A {
+        x: Int
+      }
+
+      type I1 implements A {
+        x: Int
+        i1: Int
+      }
+    `
+  };
+
+  const subgraphB = {
+    name: 'B',
+    typeDefs: gql`
+      type Query {
+        a: A @shareable
+      }
+
+      interface A {
+        x: Int
+      }
+
+      type I2 implements A {
+        x: Int
+        i2: Int
+      }
+    `
+  };
+
+  const result = composeAsFed2Subgraphs([subgraphA, subgraphB]);
+  expect(result.errors).toBeDefined();
+  expect(errorMessages(result)).toMatchStringArray([
+    `
+    For the following supergraph API query:
+    {
+      a {
+        ...
+      }
+    }
+    shared field "Query.a" return type "A" has different possible runtime types across subgraphs: it has runtime types [I1] in subgraph "A" but runtime types [I2] in subgraph "B".
+    `
+  ]);
+});
+

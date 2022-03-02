@@ -116,6 +116,10 @@ test('hints on merging field with subtype types', () => {
       v: Int
     }
 
+    type Impl implements I @shareable {
+      v: Int
+    }
+
     type T @shareable {
       f: I
     }
@@ -126,7 +130,7 @@ test('hints on merging field with subtype types', () => {
       v: Int
     }
 
-    type Impl implements I {
+    type Impl implements I @shareable {
       v: Int
     }
 
